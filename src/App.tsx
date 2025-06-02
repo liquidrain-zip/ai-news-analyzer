@@ -1,80 +1,68 @@
 import React, { useState } from "react";
-import TextInput from "./components/TextInput";
-import FileUpload from "./components/FileUpload";
-import ResultsPanel from "./components/ResultsPanel";
-import LoadingOverlay from "./components/LoadingOverlay";
-import ErrorAlert from "./components/ErrorAlert";
+import UploadForm from "./components/UploadForm";
+import ResultsDisplay from "./components/ResultsDisplay";
+import ErrorBanner from "./components/ErrorBanner";
+import Loader from "./components/Loader";
 
 const App: React.FC = () => {
-  const [text, setText] = useState("");
-  const [file, setFile] = useState<File | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+  const [articleText, setArticleText] = useState("");
   const [summary, setSummary] = useState("");
   const [nationalities, setNationalities] = useState<string[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
-  const handleSubmit = async () => {
+  const handleAnalyze = async () => {
+    if (!articleText.trim()) {
+      setError("Please enter or upload an article.");
+      return;
+    }
+
+    setLoading(true);
     setError("");
     setSummary("");
     setNationalities([]);
-    setLoading(true);
 
     try {
-      const formData = new FormData();
-
-      if (file) {
-        formData.append("file", file);
-      } else if (text.trim()) {
-        formData.append("text", text);
-      } else {
-        throw new Error("Please enter text or upload a file.");
-      }
-
-      const response = await fetch(
-        import.meta.env.VITE_API_URL || "http://localhost:8000/analyze",
-        {
-          method: "POST",
-          body: formData,
-        }
-      );
+      const response = await fetch("https://your-backend-api-url/analyze", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: articleText }),
+      });
 
       if (!response.ok) {
-        throw new Error("Server error: " + response.statusText);
+        throw new Error(`Server error: ${response.statusText}`);
       }
 
       const data = await response.json();
-      setSummary(data.summary || "");
+      setSummary(data.summary || "No summary returned.");
       setNationalities(data.nationalities || []);
     } catch (err: any) {
-      setError(err.message || "Unexpected error occurred.");
+      setError(err.message || "An error occurred.");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 p-6">
-      <div className="max-w-2xl mx-auto bg-white shadow-lg rounded-lg p-6">
-        <h1 className="text-2xl font-bold mb-6 text-center text-gray-800">
-          AI News Analyzer
-        </h1>
+    <div className="min-h-screen w-full bg-gradient-to-br from-purple-900 via-indigo-900 to-blue-900 flex flex-col items-center justify-start p-8">
+      <h1 className="text-5xl font-extrabold mb-10 text-center text-white drop-shadow-lg">
+        AI News Article Analyzer
+      </h1>
 
-        {error && <ErrorAlert message={error} />}
+      <UploadForm
+        articleText={articleText}
+        setArticleText={setArticleText}
+        handleSubmit={handleAnalyze}
+        loading={loading}
+      />
 
-        <TextInput value={text} onChange={setText} />
-        <FileUpload onFileSelect={setFile} />
+      {error && <ErrorBanner message={error} />}
 
-        <button
-          onClick={handleSubmit}
-          className="w-full bg-blue-600 text-white py-2 px-4 rounded hover:bg-blue-700 transition"
-        >
-          Submit
-        </button>
+      {!loading && (summary || nationalities.length > 0) && (
+        <ResultsDisplay summary={summary} nationalities={nationalities} />
+      )}
 
-        <ResultsPanel summary={summary} nationalities={nationalities} />
-      </div>
-
-      {loading && <LoadingOverlay />}
+      {loading && <Loader />}
     </div>
   );
 };
